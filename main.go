@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/csv"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -19,11 +20,42 @@ func getBuckets(w http.ResponseWriter, r *http.Request) {
 	}
 
 	csvReader := csv.NewReader(file)
+	var bkts []map[string]string
+
+	_, err = csvReader.Read() // header record
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Could not access metadata"))
+		return
+	}
+
+	fields, err := csvReader.Read()
+	for err == nil && len(fields) == 4 {
+		bkt := make(map[string]string)
+		bkt["Name"] = fields[0]
+		bkt["CreationTime"] = fields[1]
+		bkt["LastModifiedTime"] = fields[2]
+		bkt["Status"] = fields[3]
+		bkts = append(bkts, bkt)
+		fields, err = csvReader.Read()
+	}
+	if err != io.EOF {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Internal error while parsing metadata"))
+		return
+	}
 
 	fmt.Fprintln(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
 	fmt.Fprintln(w, "<ListAllMyBucketsResult>")
 	fmt.Fprintln(w, "\t<Buckets>")
-	// buckets
+	for _, bkt := range bkts {
+		fmt.Fprintln(w, "\t\t<Bucket>")
+		fmt.Fprintln(w, "\t\t\t<Name>"+bkt["Name"]+"</Name>")
+		fmt.Fprintln(w, "\t\t\t<CreationTime>"+bkt["CreationTime"]+"</CreationTime>")
+		fmt.Fprintln(w, "\t\t\t<LastModifiedTime>"+bkt["LastModifiedTime"]+"</LastModifiedTime>")
+		fmt.Fprintln(w, "\t\t\t<Status>"+bkt["Status"]+"</Status>")
+		fmt.Fprintln(w, "\t\t</Bucket>")
+	}
 	fmt.Fprintln(w, "\t</Buckets>")
 	fmt.Fprintln(w, "</ListAllMyBucketsResult>")
 }
@@ -52,13 +84,13 @@ func deleteObject(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "DELETE Object")
 }
 
-func methodNotAllowed(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusMethodNotAllowed)
-	w.Write([]byte("405 - Method not allowed - incorrect request"))
+func badRequest(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusBadRequest)
+	w.Write([]byte("400 - Bad request - wrong method or url"))
 }
 
 func main() {
-	http.HandleFunc("/", methodNotAllowed)
+	http.HandleFunc("/", badRequest)
 
 	http.HandleFunc("GET /{$}", getBuckets)
 
