@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 )
 
@@ -64,19 +65,21 @@ func getBuckets(w http.ResponseWriter, r *http.Request) {
 }
 
 func isValidBucketName(bucketName string) bool {
-	if len(bucketName) < 3 || len(bucketName) > 63 {
+	charsetAndLength := regexp.MustCompile("^[-.a-z0-9]{3,63}$")
+	if !charsetAndLength.MatchString(bucketName) {
 		return false
 	}
-	for _, c := range bucketName {
-		if c >= 'a' && c <= 'z' {
-			continue
-		}
-		if c >= '0' && c <= '9' {
-			continue
-		}
-		if c == '-' || c == '.' {
-			continue
-		}
+	ipFormat := regexp.MustCompile("^[0-9]+[.][0-9]+[.][0-9]+[.][0-9]+$")
+	if ipFormat.MatchString(bucketName) {
+		return false
+	}
+	startHyphen := regexp.MustCompile("^-.*")
+	endHyphen := regexp.MustCompile("^.*-$")
+	if startHyphen.MatchString(bucketName) || endHyphen.MatchString(bucketName) {
+		return false
+	}
+	consecutiveHyphens := regexp.MustCompile(".*--.*")
+	if consecutiveHyphens.MatchString(bucketName) {
 		return false
 	}
 	return true
@@ -216,7 +219,7 @@ func deleteBucket(w http.ResponseWriter, r *http.Request) {
 }
 
 func getObject(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "GET Object")
+
 }
 
 func putObject(w http.ResponseWriter, r *http.Request) {
