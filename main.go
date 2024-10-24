@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/csv"
+	"flag"
 	"fmt"
 	"io"
 	"log"
@@ -9,8 +10,11 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"time"
 )
+
+var rootDir string
 
 func writeHttpError(w http.ResponseWriter, code int, errorCode string, message string) {
 	w.WriteHeader(code)
@@ -25,7 +29,7 @@ func writeHttpError(w http.ResponseWriter, code int, errorCode string, message s
 
 // TODO: GOFUMPT
 func getBuckets(w http.ResponseWriter, r *http.Request) {
-	bucketMetadata, err := os.Open(filepath.Join("data", "buckets.csv"))
+	bucketMetadata, err := os.Open(filepath.Join(rootDir, "buckets.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -101,7 +105,7 @@ func putBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bucketPath := filepath.Join("data", bucketName)
+	bucketPath := filepath.Join(rootDir, bucketName)
 	_, err := os.Stat(bucketPath)
 	if !(err != nil && os.IsNotExist(err)) {
 		writeHttpError(w, http.StatusConflict, "BucketNameUnavailable", "Bucket with this name already exists")
@@ -120,7 +124,7 @@ func putBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	bucketMetadata, err := os.OpenFile(filepath.Join("data", "buckets.csv"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
+	bucketMetadata, err := os.OpenFile(filepath.Join(rootDir, "buckets.csv"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -160,7 +164,7 @@ func putBucket(w http.ResponseWriter, r *http.Request) {
 func deleteBucket(w http.ResponseWriter, r *http.Request) {
 	bucketName := r.PathValue("BucketName")
 
-	bucketMetadata, err := os.Open(filepath.Join("data", "buckets.csv"))
+	bucketMetadata, err := os.Open(filepath.Join(rootDir, "buckets.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -188,7 +192,7 @@ func deleteBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectMetadata, err := os.Open(filepath.Join("data", bucketName, "objects.csv"))
+	objectMetadata, err := os.Open(filepath.Join(rootDir, bucketName, "objects.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access object metadata")
 		return
@@ -210,17 +214,17 @@ func deleteBucket(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = os.Remove(filepath.Join("data", bucketName, "objects.csv"))
+	err = os.Remove(filepath.Join(rootDir, bucketName, "objects.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not delete object metadata")
 		return
 	}
-	err = os.Remove(filepath.Join("data", bucketName))
+	err = os.Remove(filepath.Join(rootDir, bucketName))
 	successfullyDeleted := true
 	if err != nil {
 		successfullyDeleted = false
 	}
-	metadataWrite, err := os.OpenFile(filepath.Join("data", "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0600)
+	metadataWrite, err := os.OpenFile(filepath.Join(rootDir, "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0600)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -241,7 +245,7 @@ func deleteBucket(w http.ResponseWriter, r *http.Request) {
 }
 
 func getObject(w http.ResponseWriter, r *http.Request) {
-	bucketMetadata, err := os.Open(filepath.Join("data", "buckets.csv"))
+	bucketMetadata, err := os.Open(filepath.Join(rootDir, "buckets.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -273,7 +277,7 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectMetadata, err := os.Open(filepath.Join("data", bucketName, "objects.csv"))
+	objectMetadata, err := os.Open(filepath.Join(rootDir, bucketName, "objects.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access object metadata")
 		return
@@ -298,7 +302,7 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	content, err := os.ReadFile(filepath.Join("data", bucketName, objectKey))
+	content, err := os.ReadFile(filepath.Join(rootDir, bucketName, objectKey))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "ObjectAccessError", "Could not access object")
 		return
@@ -309,7 +313,7 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 }
 
 func putObject(w http.ResponseWriter, r *http.Request) {
-	bucketMetadata, err := os.Open(filepath.Join("data", "buckets.csv"))
+	bucketMetadata, err := os.Open(filepath.Join(rootDir, "buckets.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -348,7 +352,7 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objectMetadata, err := os.Open(filepath.Join("data", bucketName, "objects.csv"))
+	objectMetadata, err := os.Open(filepath.Join(rootDir, bucketName, "objects.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access object metadata")
 		return
@@ -378,7 +382,7 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 		objs = append(objs, []string{objectKey, r.Header.Get("Content-Length"), r.Header.Get("Content-Type"), fmt.Sprintf("%d-%02d-%02dT%02d-%02d-%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())})
 	}
 
-	object, err := os.OpenFile(filepath.Join("data", bucketName, objectKey), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
+	object, err := os.OpenFile(filepath.Join(rootDir, bucketName, objectKey), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "ObjectAccessError", "Could not access object")
 		return
@@ -394,7 +398,7 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	objMetadataWrite, err := os.OpenFile(filepath.Join("data", bucketName, "objects.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
+	objMetadataWrite, err := os.OpenFile(filepath.Join(rootDir, bucketName, "objects.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update object metadata")
 		return
@@ -410,7 +414,7 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 	}
 	csvWriter.Flush()
 
-	bktMetadataWrite, err := os.OpenFile(filepath.Join("data", "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
+	bktMetadataWrite, err := os.OpenFile(filepath.Join(rootDir, "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update bucket metadata")
 		return
@@ -428,7 +432,7 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA DELETION
-	bucketMetadata, err := os.Open(filepath.Join("data", "buckets.csv"))
+	bucketMetadata, err := os.Open(filepath.Join(rootDir, "buckets.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access bucket metadata")
 		return
@@ -461,7 +465,7 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 		return
 	}
 
-	objectMetadata, err := os.Open(filepath.Join("data", bucketName, "objects.csv"))
+	objectMetadata, err := os.Open(filepath.Join(rootDir, bucketName, "objects.csv"))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not access object metadata")
 		return
@@ -488,13 +492,13 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 		return
 	}
 
-	err = os.Remove(filepath.Join("data", bucketName, objectKey))
+	err = os.Remove(filepath.Join(rootDir, bucketName, objectKey))
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "ObjectDeletionError", "Could not delete object")
 		return
 	}
 
-	objMetadataWrite, err := os.OpenFile(filepath.Join("data", bucketName, "objects.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
+	objMetadataWrite, err := os.OpenFile(filepath.Join(rootDir, bucketName, "objects.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update object metadata")
 		return
@@ -510,7 +514,7 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 	}
 	csvWriter.Flush()
 
-	bktMetadataWrite, err := os.OpenFile(filepath.Join("data", "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
+	bktMetadataWrite, err := os.OpenFile(filepath.Join(rootDir, "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0755)
 	if err != nil {
 		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update bucket metadata")
 		return
@@ -556,5 +560,47 @@ func main() {
 	http.HandleFunc("DELETE /{BucketName}/{ObjectKey}", deleteObject)
 	http.HandleFunc("DELETE /{BucketName}/{ObjectKey}/{$}", deleteObject)
 
-	log.Fatal(http.ListenAndServe(":1024", nil))
+	portFlag := flag.String("port", "8080", "specify port number")
+	dirFlag := flag.String("dir", "data", "specify the root directory for the buckets")
+	flag.Parse()
+
+	port, err := strconv.Atoi(*portFlag)
+	if err == nil && port == 0 {
+		log.Fatal("Port 0 is reserved and cannot be used")
+	}
+
+	rootDir = *dirFlag
+	_, err = os.Stat(rootDir)
+	if err != nil && !os.IsNotExist(err) {
+		log.Fatal(err)
+	}
+	if err != nil {
+		err = os.Mkdir(rootDir, 0755)
+		if err != nil {
+			log.Fatal("Could not create directory")
+		}
+		metadata, err := os.OpenFile(filepath.Join(rootDir, "buckets.csv"), os.O_CREATE|os.O_WRONLY, 0755)
+		if err != nil {
+			log.Fatal("Could not initiate metadata")
+		}
+		_, err = metadata.Write([]byte("Name,CreationTime,LastModifiedTime,Status\n"))
+		if err != nil {
+			log.Fatal("Could not write to metadata")
+		}
+	} else {
+		_, err := os.Stat(filepath.Join(rootDir, "buckets.csv"))
+		if err != nil && os.IsNotExist(err) {
+			metadata, err := os.OpenFile(filepath.Join(rootDir, "buckets.csv"), os.O_CREATE|os.O_WRONLY, 0755)
+			if err != nil {
+				log.Fatal("Could not initiate metadata")
+			}
+			_, err = metadata.Write([]byte("Name,CreationTime,LastModifiedTime,Status\n"))
+			if err != nil {
+				log.Fatal("Could not write to metadata")
+			}
+		} else if err != nil {
+			log.Fatal("Error with metadata")
+		}
+	}
+	log.Fatal(http.ListenAndServe(":"+*portFlag, nil))
 }
