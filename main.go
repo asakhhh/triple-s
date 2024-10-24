@@ -16,18 +16,17 @@ func getBuckets(w http.ResponseWriter, r *http.Request) {
 	file, err := os.Open(filepath.Join("data", "buckets.csv"))
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Internal Server Error - Could not access metadata"))
+		w.Write([]byte("500 - Internal Server Error - could not access metadata"))
 		return
 	}
 	defer file.Close()
 
 	csvReader := csv.NewReader(file)
 	var bkts []map[string]string
-
 	_, err = csvReader.Read() // header record
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Internal Server Error - Could not access metadata"))
+		w.Write([]byte("500 - Internal Server Error - could not access metadata"))
 		return
 	}
 
@@ -38,7 +37,9 @@ func getBuckets(w http.ResponseWriter, r *http.Request) {
 		bkt["CreationTime"] = fields[1]
 		bkt["LastModifiedTime"] = fields[2]
 		bkt["Status"] = fields[3]
-		bkts = append(bkts, bkt)
+		if bkt["Status"] == "Active" {
+			bkts = append(bkts, bkt)
+		}
 		fields, err = csvReader.Read()
 	}
 	if err != io.EOF {
@@ -114,21 +115,23 @@ func putBucket(w http.ResponseWriter, r *http.Request) {
 	file, err := os.OpenFile(filepath.Join("data", "buckets.csv"), os.O_APPEND|os.O_WRONLY|os.O_CREATE, 0600)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Internal Server Error - Could not access metadata"))
+		w.Write([]byte("500 - Internal Server Error - could not access metadata"))
 		return
 	}
 	defer file.Close()
 	modTime := info.ModTime()
-	modTimeToString := strconv.Itoa(modTime.Year()) + "-" + strconv.Itoa(int(modTime.Month())) + "-" + strconv.Itoa(modTime.Day()) + "T" + strconv.Itoa(modTime.Hour()) + ":" + strconv.Itoa(modTime.Minute())
+	modTimeToString := strconv.Itoa(modTime.Year()) + "-" + strconv.Itoa(int(modTime.Month())) +
+		"-" + strconv.Itoa(modTime.Day()) + "T" +
+		strconv.Itoa(modTime.Hour()) + ":" + strconv.Itoa(modTime.Minute())
+
 	csvWriter := csv.NewWriter(file)
 	err = csvWriter.Write([]string{bucketName, modTimeToString, modTimeToString, "Active"})
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
-		w.Write([]byte("500 - Internal Server Error - Could not update metadata"))
+		w.Write([]byte("500 - Internal Server Error - could not update metadata"))
 		return
 	}
 	csvWriter.Flush()
-	file.Close()
 
 	fmt.Fprintln(w, "<?xml version=\"1.0\" encoding=\"UTF-8\"?>")
 	fmt.Fprintln(w, "<CreateBucketResult>")
@@ -139,7 +142,77 @@ func putBucket(w http.ResponseWriter, r *http.Request) {
 }
 
 func deleteBucket(w http.ResponseWriter, r *http.Request) {
-	fmt.Fprintf(w, "DELETE Bucket")
+	bucketName := r.PathValue("BucketName")
+
+	metadata, err := os.Open(filepath.Join("data", "buckets.csv"))
+	defer metadata.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Internal Server Error - could not access metadata"))
+		return
+	}
+
+	csvReader := csv.NewReader(metadata)
+	fields, err := csvReader.Read()
+	exists := false
+	var bkts [][]string
+	for err == nil && len(fields) == 4 {
+		if fields[0] == bucketName {
+			exists = true
+			fields[3] = "Deleted"
+		}
+		bkts = append(bkts, fields)
+		fields, err = csvReader.Read()
+	}
+	if err != io.EOF {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Internal Server Error - could not access metadata"))
+		return
+	}
+	if !exists {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("400 - Bad Request - bucket does not exist"))
+		return
+	}
+
+	bkt, err := os.Open(filepath.Join("data", bucketName))
+	defer bkt.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Internal Server Error - could not access bucket"))
+		return
+	}
+	_, err = bkt.Readdirnames(1)
+	if err != io.EOF {
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte("400 - Bad Request - bucket not empty"))
+		return
+	}
+
+	err = os.Remove(filepath.Join("data", bucketName))
+	successfullyDeleted := true
+	if err != nil {
+		successfullyDeleted = false
+	}
+	metadataWrite, err := os.OpenFile(filepath.Join("data", "buckets.csv"), os.O_WRONLY|os.O_TRUNC, 0600)
+	defer metadataWrite.Close()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("500 - Internal Server Error - could not access metadata"))
+		return
+	}
+	csvWriter := csv.NewWriter(metadataWrite)
+	for _, bkt := range bkts {
+		if bkt[0] != bucketName || !successfullyDeleted {
+			err = csvWriter.Write(bkt)
+			if err != nil {
+				w.WriteHeader(http.StatusInternalServerError)
+				w.Write([]byte("500 - Internal Server Error - could not update metadata"))
+				return
+			}
+		}
+	}
+	csvWriter.Flush()
 }
 
 func getObject(w http.ResponseWriter, r *http.Request) {
