@@ -562,7 +562,22 @@ func main() {
 
 	portFlag := flag.String("port", "8080", "specify port number")
 	dirFlag := flag.String("dir", "data", "specify the root directory for the buckets")
+	helpFlag := flag.Bool("help", false, "provides usage information")
 	flag.Parse()
+
+	if *helpFlag {
+		fmt.Println("Simple Storage Service.")
+		fmt.Println()
+		fmt.Println("**Usage:**")
+		fmt.Println("\ttriple-s [-port <N>] [-dir <S>]")
+		fmt.Println("\ttriple-s --help")
+		fmt.Println()
+		fmt.Println("**Options:**")
+		fmt.Println("- --help\tShow this screen.")
+		fmt.Println("- --port N\tPort number")
+		fmt.Println("- --dir S\tPath to the directory")
+		os.Exit(0)
+	}
 
 	port, err := strconv.Atoi(*portFlag)
 	if err == nil && port == 0 {
