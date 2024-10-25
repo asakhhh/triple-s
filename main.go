@@ -367,6 +367,9 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 			objectFound = true
 			fields[1] = r.Header.Get("Content-Length")
 			fields[2] = r.Header.Get("Content-Type")
+			if len(fields[2]) == 0 {
+				fields[2] = "text/plain"
+			}
 			now := time.Now()
 			fields[3] = fmt.Sprintf("%d-%02d-%02dT%02d-%02d-%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())
 		}
@@ -379,7 +382,11 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 	}
 	if !objectFound {
 		now := time.Now()
-		objs = append(objs, []string{objectKey, r.Header.Get("Content-Length"), r.Header.Get("Content-Type"), fmt.Sprintf("%d-%02d-%02dT%02d-%02d-%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())})
+		newRec := []string{objectKey, r.Header.Get("Content-Length"), r.Header.Get("Content-Type"), fmt.Sprintf("%d-%02d-%02dT%02d-%02d-%02d", now.Year(), now.Month(), now.Day(), now.Hour(), now.Minute(), now.Second())}
+		if len(newRec[2]) == 0 {
+			newRec[2] = "text/plain"
+		}
+		objs = append(objs, newRec)
 	}
 
 	object, err := os.OpenFile(filepath.Join(rootDir, bucketName, objectKey), os.O_CREATE|os.O_WRONLY|os.O_TRUNC, 0o755)
