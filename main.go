@@ -91,8 +91,9 @@ func isValidBucketName(bucketName string) (bool, string) {
 		return false, "Name must not start or end with a hyphen"
 	}
 	consecutiveHyphens := regexp.MustCompile(".*--.*")
-	if consecutiveHyphens.MatchString(bucketName) {
-		return false, "Name must not contain consecutive hyphens"
+	consecutiveDots := regexp.MustCompile(".*[.][.].*")
+	if consecutiveHyphens.MatchString(bucketName) || consecutiveDots.MatchString(bucketName) {
+		return false, "Name must not contain consecutive hyphens/dots"
 	}
 	return true, ""
 }
