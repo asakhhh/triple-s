@@ -173,6 +173,11 @@ func deleteBucket(w http.ResponseWriter, r *http.Request) {
 	defer bucketMetadata.Close()
 
 	csvReader := csv.NewReader(bucketMetadata)
+	_, err = csvReader.Read() // header
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read bucket metadata")
+		return
+	}
 	fields, err := csvReader.Read()
 	exists := false
 	var bkts [][]string
@@ -232,6 +237,11 @@ func deleteBucket(w http.ResponseWriter, r *http.Request) {
 	}
 	defer metadataWrite.Close()
 	csvWriter := csv.NewWriter(metadataWrite)
+	err = csvWriter.Write([]string{"Name", "CreationTime", "LastModifiedTime", "Status"})
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update bucket metadata")
+		return
+	}
 	for _, bkt := range bkts {
 		if bkt[0] != bucketName || !successfullyDeleted {
 			err = csvWriter.Write(bkt)
@@ -255,6 +265,11 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 
 	bucketName := r.PathValue("BucketName")
 	csvReader := csv.NewReader(bucketMetadata)
+	_, err = csvReader.Read() // header
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read bucket metadata")
+		return
+	}
 	fields, err := csvReader.Read()
 	bucketFound := false
 	for err == nil {
@@ -285,6 +300,11 @@ func getObject(w http.ResponseWriter, r *http.Request) {
 	}
 	defer objectMetadata.Close()
 	csvReader = csv.NewReader(objectMetadata)
+	_, err = csvReader.Read() // header
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read object metadata")
+		return
+	}
 	fields, err = csvReader.Read()
 	var objectInfo []string
 	for err == nil {
@@ -323,6 +343,11 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 
 	bucketName := r.PathValue("BucketName")
 	csvReader := csv.NewReader(bucketMetadata)
+	_, err = csvReader.Read() // header
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read bucket metadata")
+		return
+	}
 	fields, err := csvReader.Read()
 	var bkts [][]string
 	bucketFound := false
@@ -360,6 +385,11 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 	}
 	defer objectMetadata.Close()
 	csvReader = csv.NewReader(objectMetadata)
+	_, err = csvReader.Read() // header
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read object metadata")
+		return
+	}
 	fields, err = csvReader.Read()
 	var objs [][]string
 	objectFound := false
@@ -413,6 +443,11 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 	}
 	defer objMetadataWrite.Close()
 	csvWriter := csv.NewWriter(objMetadataWrite)
+	err = csvWriter.Write([]string{"ObjectKey", "Size", "ContentType", "LastModified"})
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not write to object metadata")
+		return
+	}
 	for _, obj := range objs {
 		err = csvWriter.Write(obj)
 		if err != nil {
@@ -429,6 +464,11 @@ func putObject(w http.ResponseWriter, r *http.Request) {
 	}
 	defer bktMetadataWrite.Close()
 	csvWriter = csv.NewWriter(bktMetadataWrite)
+	err = csvWriter.Write([]string{"Name", "CreationTime", "LastModifiedTime", "Status"})
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update bucket metadata")
+		return
+	}
 	for _, bkt := range bkts {
 		err = csvWriter.Write(bkt)
 		if err != nil {
@@ -449,6 +489,11 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 
 	bucketName := r.PathValue("BucketName")
 	csvReader := csv.NewReader(bucketMetadata)
+	_, err = csvReader.Read() // header
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read bucket metadata")
+		return
+	}
 	fields, err := csvReader.Read()
 	var bkts [][]string
 	bucketFound := false
@@ -480,6 +525,11 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 	}
 	defer objectMetadata.Close()
 	csvReader = csv.NewReader(objectMetadata)
+	_, err = csvReader.Read()
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not read object metadata")
+		return
+	}
 	fields, err = csvReader.Read()
 	var objs [][]string
 	objectFound := false
@@ -513,6 +563,11 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 	}
 	defer objMetadataWrite.Close()
 	csvWriter := csv.NewWriter(objMetadataWrite)
+	err = csvWriter.Write([]string{"ObjectKey", "Size", "ContentType", "LastModified"})
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not write to object metadata")
+		return
+	}
 	for _, obj := range objs {
 		err = csvWriter.Write(obj)
 		if err != nil {
@@ -529,6 +584,11 @@ func deleteObject(w http.ResponseWriter, r *http.Request) { // PROHIBIT METADATA
 	}
 	defer bktMetadataWrite.Close()
 	csvWriter = csv.NewWriter(bktMetadataWrite)
+	err = csvWriter.Write([]string{"Name", "CreationTime", "LastModifiedTime", "Status"})
+	if err != nil {
+		writeHttpError(w, http.StatusInternalServerError, "MetadataError", "Could not update bucket metadata")
+		return
+	}
 	for i, bkt := range bkts {
 		if bkt[0] == bucketName {
 			now := time.Now()
